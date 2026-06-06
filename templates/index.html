@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cell Counter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <div class="container">
+        <h1>Cell Counter</h1>
+        <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="image" accept="image/*" required>
+            <button type="submit">Upload and Count Cells</button>
+        </form>
+        {% if result %}
+            <div class="result">
+                <h2>Result:</h2>
+                <p>{{ result }}</p>
+                <img src="/result-image" alt="Cell segmentation result">
+            </div>
+        {% endif %}
+</body>
+</html>

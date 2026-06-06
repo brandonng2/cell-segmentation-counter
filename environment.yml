@@ -1,0 +1,12 @@
+name: BME_CV
+dependencies:
+  - python=3.14
+  - pandas
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - jupyter
+  - ipykernel
+  - notebook
+  - scikit-image
+  - flask

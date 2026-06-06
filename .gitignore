@@ -1,0 +1,30 @@
+# Python
+
+**pycache**/
+_.py[cod]
+_.egg-info/
+dist/
+build/
+
+# Jupyter
+
+.ipynb_checkpoints/
+
+# Conda / virtualenv
+
+.env
+.venv
+env/
+
+# Flask
+
+instance/
+.webassets-cache
+
+# OS
+
+.DS_Store
+
+# Data (remove this line if you want to track data files)
+
+data/
