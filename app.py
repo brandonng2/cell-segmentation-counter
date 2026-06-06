@@ -1,32 +1,90 @@
-import io
+import base64
+import os
+
 import cv2
 import numpy as np
-from flask import Flask, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request
+
 from cell_counter import count_cells
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB upload cap
 
-_result_img_bytes = None
+ALLOWED = {"png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp"}
+
+
+def _allowed(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED
+
+
+def _to_data_uri(img_bgr, fmt=".jpg"):
+    ok, buf = cv2.imencode(fmt, img_bgr)
+    if not ok:
+        raise RuntimeError("Image encoding failed")
+    b64 = base64.b64encode(buf.tobytes()).decode()
+    mime = "image/jpeg" if fmt == ".jpg" else "image/png"
+    return f"data:{mime};base64,{b64}"
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    global _result_img_bytes
+
+@app.route("/segment", methods=["POST"])
+def segment():
+    if "image" not in request.files:
+        return jsonify({"error": "No file was uploaded."}), 400
+
     file = request.files["image"]
-    img_array = np.frombuffer(file.read(), np.uint8)
-    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    if file.filename == "":
+        return jsonify({"error": "No file was selected."}), 400
 
-    num_cells, result_array = count_cells(img)
+    if not _allowed(file.filename):
+        return jsonify({"error": "Unsupported file type."}), 400
 
-    _, buffer = cv2.imencode(".png", result_array)
-    _result_img_bytes = io.BytesIO(buffer.tobytes())
+    raw = file.read()
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return jsonify({"error": "Could not decode image."}), 400
 
-    return render_template("index.html", result=f"{num_cells} cells detected")
+    try:
+        out = count_cells(img)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Segmentation failed")
+        return jsonify({"error": f"Processing failed: {exc}"}), 500
 
-@app.route("/result-image")
-def result_image():
-    _result_img_bytes.seek(0)
-    return send_file(_result_img_bytes, mimetype="image/png")
+    # blend colorized labels onto original for the comparison overlay
+    labels_bgr = out["labels_img"]
+    cell_mask = (labels_bgr.sum(axis=2) > 0).astype(np.uint8)[:, :, np.newaxis]
+    overlay = np.where(cell_mask, cv2.addWeighted(img, 0.4, labels_bgr, 0.6, 0), img)
+
+    per_cell = out["per_cell"]
+    areas = [c["area"] for c in per_cell]
+    radii = [c["equivalent_diameter"] / 2 for c in per_cell]
+    metrics = {
+        "cell_count": out["num_cells"],
+        "mean_area": round(float(np.mean(areas)), 1) if areas else 0,
+        "avg_radius": round(float(np.mean(radii)), 1) if radii else 0,
+        "min_distance": out["min_distance"],
+        "per_cell": per_cell,
+    }
+
+    binary_3ch = cv2.cvtColor(out["binary_img"], cv2.COLOR_GRAY2BGR)
+
+    return jsonify({
+        "original": _to_data_uri(img),
+        "overlay": _to_data_uri(overlay),
+        "labels": _to_data_uri(out["labels_img"]),
+        "distance": _to_data_uri(out["dist_img"]),
+        "binary": _to_data_uri(binary_3ch),
+        "metrics": metrics,
+    })
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 3000))
+    app.run(host="0.0.0.0", port=port, debug=True)

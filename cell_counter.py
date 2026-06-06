@@ -59,7 +59,6 @@ def count_cells(img):
     typical_radius = int(np.sqrt(typical_area / np.pi))
     min_distance = max(10, int(typical_radius * 0.6))
 
-    # dist_smooth = cv2.GaussianBlur(dist.astype(np.float32), (5, 5), 0)
     coords = peak_local_max(dist, min_distance=min_distance, threshold_abs=0.1, exclude_border=False)
     peaks = np.zeros_like(dist, dtype=np.uint8)
     peaks[tuple(coords.T)] = 1
@@ -104,5 +103,32 @@ def count_cells(img):
     result[markers <= 0] = 0
     result[fov_mask == 0] = 0
 
-    # return num_cells, result, typical_radius, min_distance
-    return num_cells, result
+    # per-cell measurements via regionprops
+    label_map = np.zeros_like(markers, dtype=np.int32)
+    for new_id, old_id in enumerate(sorted(valid_labels), start=1):
+        label_map[markers == old_id] = new_id
+    props = ski.measure.regionprops(label_map)
+    per_cell = [
+        {
+            "id": i + 1,
+            "area": int(p.area),
+            "perimeter": round(p.perimeter, 1),
+            "equivalent_diameter": round(p.equivalent_diameter, 1),
+            "eccentricity": round(p.eccentricity, 3),
+        }
+        for i, p in enumerate(props)
+    ]
+
+    # distance transform colorized for visualization
+    dist_vis = (dist * 255).astype(np.uint8)
+    dist_color = cv2.applyColorMap(dist_vis, cv2.COLORMAP_VIRIDIS)
+    dist_color[fov_mask == 0] = 0
+
+    return {
+        "num_cells": num_cells,
+        "min_distance": min_distance,
+        "labels_img": result,
+        "dist_img": dist_color,
+        "binary_img": prepped,
+        "per_cell": per_cell,
+    }
