@@ -26,7 +26,3 @@ instance/
 # OS
 
 .DS_Store
-
-# Data (remove this line if you want to track data files)
-
-data/

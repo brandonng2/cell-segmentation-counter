@@ -115,6 +115,8 @@ def count_cells(img):
             "perimeter": round(p.perimeter, 1),
             "equivalent_diameter": round(p.equivalent_diameter, 1),
             "eccentricity": round(p.eccentricity, 3),
+            "centroid_x": round(p.centroid[1], 1),
+            "centroid_y": round(p.centroid[0], 1),
         }
         for i, p in enumerate(props)
     ]

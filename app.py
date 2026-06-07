@@ -3,18 +3,15 @@ import os
 
 import cv2
 import numpy as np
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from cell_counter import count_cells
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB upload cap
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-ALLOWED = {"png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp"}
-
-
-def _allowed(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+SAMPLE_EXTS = {".jpg", ".jpeg", ".png"}
 
 
 def _to_data_uri(img_bgr, fmt=".jpg"):
@@ -31,6 +28,20 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/samples")
+def samples():
+    files = sorted(
+        f for f in os.listdir(DATA_DIR)
+        if os.path.splitext(f)[1].lower() in SAMPLE_EXTS
+    )
+    return jsonify(files)
+
+
+@app.route("/data/<filename>")
+def sample_file(filename):
+    return send_from_directory(DATA_DIR, filename)
+
+
 @app.route("/segment", methods=["POST"])
 def segment():
     if "image" not in request.files:
@@ -40,7 +51,7 @@ def segment():
     if file.filename == "":
         return jsonify({"error": "No file was selected."}), 400
 
-    if not _allowed(file.filename):
+    if file.filename.rsplit(".", 1)[-1].lower() not in {"png", "jpg", "jpeg"}:
         return jsonify({"error": "Unsupported file type."}), 400
 
     raw = file.read()
@@ -53,11 +64,10 @@ def segment():
         out = count_cells(img)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         app.logger.exception("Segmentation failed")
         return jsonify({"error": f"Processing failed: {exc}"}), 500
 
-    # blend colorized labels onto original for the comparison overlay
     labels_bgr = out["labels_img"]
     cell_mask = (labels_bgr.sum(axis=2) > 0).astype(np.uint8)[:, :, np.newaxis]
     overlay = np.where(cell_mask, cv2.addWeighted(img, 0.4, labels_bgr, 0.6, 0), img)
@@ -78,7 +88,7 @@ def segment():
     return jsonify({
         "original": _to_data_uri(img),
         "overlay": _to_data_uri(overlay),
-        "labels": _to_data_uri(out["labels_img"]),
+        "labels": _to_data_uri(overlay),
         "distance": _to_data_uri(out["dist_img"]),
         "binary": _to_data_uri(binary_3ch),
         "metrics": metrics,

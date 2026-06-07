@@ -50,6 +50,15 @@
           and compute a distance transform with per-cell metrics.
         </p>
 
+        <div class="sample-section">
+          <p class="sample-label">Try a sample</p>
+          <div class="carousel-track" id="sample-track"></div>
+        </div>
+
+        <div class="sample-divider">
+          <span>or upload your own</span>
+        </div>
+
         <form id="upload-form">
           <label
             id="dropzone"
@@ -106,13 +115,16 @@
 
         <div id="results-content" hidden>
           <!-- Metrics -->
+          <div class="result-head">
+            <h2>Metadata</h2>
+          </div>
           <div class="metrics-grid" id="metrics-grid"></div>
 
           <!-- Comparison slider -->
           <div class="result-block">
             <div class="result-head">
               <h2>Original vs. Segmentation</h2>
-              <p>Drag the handle to compare.</p>
+              <p>Drag the handle to compare. Toggle between image masks using the buttons below.</p>
             </div>
             <div id="compare" class="compare">
               <img id="cmp-after" class="cmp-img" alt="Segmentation overlay" />
@@ -122,22 +134,23 @@
               <div id="cmp-handle" class="cmp-handle" aria-hidden="true">
                 <span></span>
               </div>
+              <canvas id="cell-highlight"></canvas>
               <span class="cmp-tag cmp-tag-left">Original</span>
-              <span class="cmp-tag cmp-tag-right">Segmented</span>
+              <span class="cmp-tag cmp-tag-right">Segmentation labels</span>
             </div>
           </div>
 
           <!-- Image gallery -->
           <div class="gallery">
-            <figure class="shot">
+            <figure class="shot" data-label="Segmentation labels">
               <img id="img-labels" alt="Labeled cell segmentation" />
               <figcaption>Segmentation labels</figcaption>
             </figure>
-            <figure class="shot">
+            <figure class="shot" data-label="Distance transform">
               <img id="img-distance" alt="Distance transform" />
               <figcaption>Distance transform</figcaption>
             </figure>
-            <figure class="shot">
+            <figure class="shot" data-label="Foreground mask">
               <img id="img-binary" alt="Binary foreground mask" />
               <figcaption>Foreground mask</figcaption>
             </figure>
@@ -147,7 +160,7 @@
           <div class="result-block">
             <div class="result-head">
               <h2>Per-cell measurements</h2>
-              <p>Area in pixels, shape descriptors per detected cell.</p>
+              <p>Area in pixels, shape descriptors per detected cell. Click on a row to highlight the corresponding cell in the comparison view.</p>
             </div>
             <div class="table-wrap">
               <table class="cell-table">
