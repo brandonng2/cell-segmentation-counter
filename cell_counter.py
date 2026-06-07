@@ -23,30 +23,40 @@ def count_cells(img):
     l_channel, a_channel, b_channel = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2LAB))
 
     channel, region_idx = detect_background_type(img, fov_mask, l_channel, b_channel)
+    del l_channel, a_channel, b_channel
     channel_clahe = clahe.apply(channel)
+    del channel
     channel_masked = channel_clahe[fov_mask == 255]
     thresholds = filters.threshold_multiotsu(channel_masked, classes=3)
+    del channel_masked
     regions = np.digitize(channel_clahe, bins=thresholds)
+    del channel_clahe
     binary = ((regions == region_idx) & (fov_mask == 255)).astype(np.uint8) * 255
+    del regions
 
     # dynamic noise threshold based on image resolution
     noise_size = int(np.pi * (h * 0.005) ** 2)
 
     # remove noise
     cleaned = ski.morphology.remove_small_objects(binary.astype(bool), max_size=noise_size)
+    del binary
 
     # seal broken ring outlines before contouring
     close_radius = max(2, int(h * 0.005 * 0.5))
     sealed = ski.morphology.closing(cleaned, ski.morphology.disk(close_radius))
+    del cleaned
 
     # solidify: fill enclosed regions (handles both solid blobs and closed/sealed rings)
     sealed_uint8 = sealed.astype(np.uint8) * 255
+    del sealed
     contours, _ = cv2.findContours(sealed_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     filled = np.zeros_like(sealed_uint8)
+    del sealed_uint8
     cv2.drawContours(filled, contours, -1, 255, thickness=cv2.FILLED)
 
     # crop to FOV aperture
     prepped = (filled.astype(bool) & fov_mask.astype(bool)).astype(np.uint8) * 255
+    del filled
 
     # distance transform
     dist = cv2.distanceTransform(prepped, cv2.DIST_L2, 3)

@@ -60,6 +60,12 @@ def segment():
     if img is None:
         return jsonify({"error": "Could not decode image."}), 400
 
+    MAX_DIM = 1024
+    h, w = img.shape[:2]
+    if max(h, w) > MAX_DIM:
+        scale = MAX_DIM / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
     try:
         out = count_cells(img)
     except ValueError as exc:
